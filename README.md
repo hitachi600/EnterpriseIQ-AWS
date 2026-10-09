@@ -1,11 +1,16 @@
 # EnterpriseIQ: Secure Enterprise Generative AI Knowledge & Support Platform on AWS
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-2ea44f?style=for-the-badge&logo=github)](https://hitachi600.github.io/EnterpriseIQ-AWS/)
 [![AWS Architecture](https://img.shields.io/badge/AWS-Serverless%20%26%20Bedrock-orange.svg)](https://aws.amazon.com/)
 [![RAG Security](https://img.shields.io/badge/Security-Multi--Department%20RBAC-green.svg)]()
 [![Model](https://img.shields.io/badge/LLM-Anthropic%20Claude%203.5%20Sonnet-blue.svg)]()
 [![Embeddings](https://img.shields.io/badge/Embeddings-Titan%20Text%20V2%20(1024--dim)-purple.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)]()
 
+> 🚀 **Live Interactive Demo:** [https://hitachi600.github.io/EnterpriseIQ-AWS/](https://hitachi600.github.io/EnterpriseIQ-AWS/)
+> 
+> 📕 **Complete 26-Module Study Guide & Playbook:** [Download Master PDF](docs/EnterpriseIQ_26_Modules_Complete_Study_Guide.pdf)
+>
 > **Production-grade, multi-tenant Enterprise Knowledge Retrieval & Decision Support Platform built on AWS using Amazon Bedrock, Bedrock Knowledge Bases, S3 SSE-KMS, Serverless Lambda, Amazon Cognito, and DynamoDB.**
 
 ---

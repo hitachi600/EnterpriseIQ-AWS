@@ -1,10 +1,6 @@
 name: EnterpriseIQ Multi-Environment Continuous Deployment (CD)
 
 on:
-  push:
-    branches:
-      - develop  # Deploys to Dev / Staging
-      - main     # Deploys to Production
   workflow_dispatch:
     inputs:
       target_env:
