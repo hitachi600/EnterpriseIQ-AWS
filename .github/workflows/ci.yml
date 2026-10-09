@@ -38,6 +38,7 @@ jobs:
 
       - name: Execute EnterpriseIQ Test Suite (26 Tests)
         env:
+          PYTHONPATH: .
           ENVIRONMENT: test
           AWS_REGION: us-east-1
           DYNAMODB_SINGLE_TABLE_NAME: EnterpriseIQ-Core-State-test
