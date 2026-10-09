@@ -15,9 +15,8 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to ${{ github.ref_name == 'main' && 'Production' || 'Development' }}
+    name: Deploy CloudFormation Microservices
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.target_env || (github.ref_name == 'main' && 'prod' || 'dev') }}
 
     steps:
       - name: Checkout Code
