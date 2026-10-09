@@ -33,7 +33,8 @@ export const ApprovalsPage: React.FC<ApprovalsPageProps> = ({ onViewDocument }) 
 
   useEffect(() => {
     loadApprovals();
-  }, []);
+    setSelectedDept('ALL');
+  }, [currentUser]);
 
   const loadApprovals = () => {
     const list = apiService.getApprovals();
@@ -45,10 +46,6 @@ export const ApprovalsPage: React.FC<ApprovalsPageProps> = ({ onViewDocument }) 
   const filteredApprovals = approvals.filter(item => {
     if (selectedStatus !== 'ALL' && item.status !== selectedStatus) return false;
     if (selectedDept !== 'ALL' && item.department !== selectedDept) return false;
-    // Non-admins only see their department's approvals unless in Management
-    if (!isAdmin && currentUser.department !== 'Management' && item.department !== currentUser.department) {
-      return false;
-    }
     return true;
   });
 
