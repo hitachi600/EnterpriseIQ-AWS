@@ -1,0 +1,18 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "staging"
+  },
+  {
+    "ParameterKey": "DocumentVaultBucketName",
+    "ParameterValue": "nexora-enterprise-kb-vault-staging"
+  },
+  {
+    "ParameterKey": "DynamoDBTableName",
+    "ParameterValue": "EnterpriseIQ-Core-State-staging"
+  },
+  {
+    "ParameterKey": "BedrockKnowledgeBaseId",
+    "ParameterValue": "NEXORAKB-STAGE-01"
+  }
+]

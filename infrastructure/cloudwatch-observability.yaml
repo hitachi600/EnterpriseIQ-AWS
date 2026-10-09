@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  EnterpriseIQ - Amazon CloudWatch Observability, Structured Metric Filters & Alarms
+  Provides unified operational dashboards, security event metric filters, and SNS alerting.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+  AlertsTopicArn:
+    Type: String
+    Default: 'arn:aws:sns:us-east-1:123456789012:EnterpriseIQ-Ingestion-Alerts-prod'
+
+Resources:
+  # ============================================================================
+  # 1. CloudWatch Metric Filter: Prompt Injection Security Events
+  # ============================================================================
+  PromptInjectionMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/EnterpriseIQ-Query-${Environment}'
+      FilterPattern: '{ $.event = "PROMPT_INJECTION_DEFENSE_TRIGGERED" }'
+      MetricTransformations:
+        - MetricName: PromptInjectionBlocks
+          MetricNamespace: EnterpriseIQ/Security
+          MetricValue: '1'
+          Unit: Count
+
+  # ============================================================================
+  # 2. CloudWatch Metric Filter: Unauthorized Cross-Department RBAC Blocks
+  # ============================================================================
+  UnauthorizedAccessMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/EnterpriseIQ-Admin-${Environment}'
+      FilterPattern: '{ $.event = "UNAUTHORIZED_ADMIN_ACCESS_ATTEMPT" }'
+      MetricTransformations:
+        - MetricName: UnauthorizedAccessAttempts
+          MetricNamespace: EnterpriseIQ/Security
+          MetricValue: '1'
+          Unit: Count
+
+  # ============================================================================
+  # 3. CloudWatch Alarm: High Security Anomalies Alert
+  # ============================================================================
+  SecurityAnomaliesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'EnterpriseIQ-Security-Anomalies-Alarm-${Environment}'
+      AlarmDescription: Triggers urgent alert if prompt injections or unauthorized access attempts spike
+      MetricName: PromptInjectionBlocks
+      Namespace: EnterpriseIQ/Security
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlertsTopicArn
+
+  # ============================================================================
+  # 4. CloudWatch Operational & GenAI Monitoring Dashboard
+  # ============================================================================
+  OperationalDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub 'EnterpriseIQ-Executive-Dashboard-${Environment}'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/Lambda", "Invocations", "FunctionName", "EnterpriseIQ-Query-${Environment}", { "stat": "Sum" } ],
+                  [ ".", "Errors", ".", ".", { "stat": "Sum", "color": "#d62728" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Query Lambda Invocations & Errors"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "EnterpriseIQ/Security", "PromptInjectionBlocks", { "stat": "Sum", "color": "#ff7f0e" } ],
+                  [ ".", "UnauthorizedAccessAttempts", { "stat": "Sum", "color": "#d62728" } ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "AI Security & RBAC Enforcement Events"
+              }
+            }
+          ]
+        }
+
+Outputs:
+  DashboardName:
+    Value: !Ref OperationalDashboard
+    Export:
+      Name: !Sub 'EnterpriseIQ-DashboardName-${Environment}'

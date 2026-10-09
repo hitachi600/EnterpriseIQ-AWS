@@ -1,0 +1,18 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "DocumentVaultBucketName",
+    "ParameterValue": "nexora-enterprise-kb-vault-dev"
+  },
+  {
+    "ParameterKey": "DynamoDBTableName",
+    "ParameterValue": "EnterpriseIQ-Core-State-dev"
+  },
+  {
+    "ParameterKey": "BedrockKnowledgeBaseId",
+    "ParameterValue": "NEXORAKB-DEV-01"
+  }
+]

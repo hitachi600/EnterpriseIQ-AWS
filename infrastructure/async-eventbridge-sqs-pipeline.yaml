@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  EnterpriseIQ - Asynchronous Event-Driven Ingestion Pipeline
+  Implements S3 ObjectCreated EventBridge Filter, SQS Ingestion Queue with DLQ,
+  Lambda Ingestion Worker, and SNS Ingestion Failure Alert Topic.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+  DocumentVaultBucketName:
+    Type: String
+    Default: nexora-enterprise-kb-vault-prod
+  AlertEmail:
+    Type: String
+    Default: devops-alerts@nexora.com
+
+Resources:
+  # ============================================================================
+  # 1. Amazon SNS Alert Topic for Ingestion Failures
+  # ============================================================================
+  IngestionAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'EnterpriseIQ-Ingestion-Alerts-${Environment}'
+      DisplayName: EnterpriseIQ Document Lake Ingestion Alerts
+
+  # ============================================================================
+  # 2. Amazon SQS Dead-Letter Queue (DLQ) & Main Ingestion Queue
+  # ============================================================================
+  IngestionDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'EnterpriseIQ-Ingestion-DLQ-${Environment}'
+      MessageRetentionPeriod: 1209600 # 14 days
+      KmsMasterKeyId: alias/aws/sqs
+
+  IngestionQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'EnterpriseIQ-Ingestion-Queue-${Environment}'
+      VisibilityTimeout: 180
+      MessageRetentionPeriod: 345600 # 4 days
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt IngestionDeadLetterQueue.Arn
+        maxReceiveCount: 3
+      KmsMasterKeyId: alias/aws/sqs
+
+  # SQS Policy allowing EventBridge to send messages
+  IngestionQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref IngestionQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: 'sqs:SendMessage'
+            Resource: !GetAtt IngestionQueue.Arn
+            Condition:
+              ArnEquals:
+                'aws:SourceArn': !GetAtt S3DocumentUploadRule.Arn
+
+  # ============================================================================
+  # 3. Amazon EventBridge Rule: Filter S3 ObjectCreated Events
+  # ============================================================================
+  S3DocumentUploadRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'EnterpriseIQ-S3-Document-Upload-Rule-${Environment}'
+      Description: Captures new document uploads in S3 and routes to SQS Ingestion Queue
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - 'Object Created'
+        detail:
+          bucket:
+            name:
+              - !Ref DocumentVaultBucketName
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt IngestionQueue.Arn
+          Id: SQS-Ingestion-Target
+
+  # ============================================================================
+  # 4. CloudWatch Alarm: SQS Dead-Letter Queue Alert (>0 messages)
+  # ============================================================================
+  DLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'EnterpriseIQ-DLQ-Messages-Alarm-${Environment}'
+      AlarmDescription: Triggers immediate SNS alert if document ingestion DLQ receives failed messages
+      MetricName: ApproximateNumberOfMessagesVisible
+      Namespace: AWS/SQS
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt IngestionDeadLetterQueue.QueueName
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref IngestionAlertsTopic
+
+Outputs:
+  IngestionQueueUrl:
+    Value: !Ref IngestionQueue
+    Export:
+      Name: !Sub 'EnterpriseIQ-IngestionQueueUrl-${Environment}'
+  DLQUrl:
+    Value: !Ref IngestionDeadLetterQueue
+    Export:
+      Name: !Sub 'EnterpriseIQ-DLQUrl-${Environment}'

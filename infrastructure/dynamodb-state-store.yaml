@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  EnterpriseIQ - Amazon DynamoDB Single-Table State Store & Point-in-Time Recovery
+  Provides low-latency persistence for Chat Sessions, Feedback, Document Registry, and Audit Trails.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+
+Resources:
+  # ============================================================================
+  # 1. Amazon DynamoDB Single-Table State Store (Pay-Per-Request / On-Demand)
+  # ============================================================================
+  CoreStateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'EnterpriseIQ-Core-State-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-Department-Index
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: EnterpriseIQ
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  TableName:
+    Description: Name of the DynamoDB Single-Table
+    Value: !Ref CoreStateTable
+    Export:
+      Name: !Sub 'EnterpriseIQ-DynamoDBTableName-${Environment}'
+
+  TableArn:
+    Description: ARN of the DynamoDB Single-Table
+    Value: !GetAtt CoreStateTable.Arn
+    Export:
+      Name: !Sub 'EnterpriseIQ-DynamoDBTableArn-${Environment}'

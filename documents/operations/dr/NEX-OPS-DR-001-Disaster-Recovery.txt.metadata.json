@@ -1,0 +1,13 @@
+{
+  "metadataAttributes": {
+    "department": "Operations",
+    "classification": "CONFIDENTIAL",
+    "documentId": "NEX-OPS-DR-001",
+    "title": "Business Continuity & Multi-Region Disaster Recovery Protocol",
+    "uploadedBy": "amara.patel@nexora.com",
+    "version": "4.0",
+    "lastUpdated": "2026-07-22",
+    "author": "Amara Patel",
+    "category": "Disaster Recovery"
+  }
+}

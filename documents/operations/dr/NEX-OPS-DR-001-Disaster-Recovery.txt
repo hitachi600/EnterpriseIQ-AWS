@@ -1,0 +1,10 @@
+NEXORA OPERATIONS - GLOBAL DISASTER RECOVERY PROTOCOL
+CLASSIFICATION: CONFIDENTIAL
+
+1. OBJECTIVES (RTO & RPO)
+- RTO (Recovery Time Objective): Maximum 15 minutes for Tier-1 Customer Portal and Payment APIs.
+- RPO (Recovery Point Objective): Maximum 5 minutes data loss limit via DynamoDB Global Tables and Aurora Multi-Region.
+
+2. FAILOVER COMMAND STRUCTURE
+- Disaster declaration authority: VP of Operations or Head of Cloud Infrastructure.
+- Automated Route 53 Application Recovery Controller (ARC) health checks trigger DNS failover if primary region error rate > 5% for 3 consecutive minutes.

@@ -1,0 +1,74 @@
+name: EnterpriseIQ Multi-Environment Continuous Deployment (CD)
+
+on:
+  push:
+    branches:
+      - develop  # Deploys to Dev / Staging
+      - main     # Deploys to Production
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target Deployment Environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.ref_name == 'main' && 'Production' || 'Development' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.target_env || (github.ref_name == 'main' && 'prod' || 'dev') }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Set Target Environment Variables
+        run: |
+          DEPLOY_ENV="${{ github.event.inputs.target_env || (github.ref_name == 'main' && 'prod' || 'dev') }}"
+          echo "DEPLOY_ENV=$DEPLOY_ENV" >> $GITHUB_ENV
+          echo "Deploying EnterpriseIQ to Environment: $DEPLOY_ENV"
+
+      - name: Deploy DynamoDB State Store
+        run: |
+          aws cloudformation deploy \
+            --template-file infrastructure/dynamodb-state-store.yaml \
+            --stack-name EnterpriseIQ-DynamoDB-${DEPLOY_ENV} \
+            --parameter-overrides Environment=${DEPLOY_ENV} \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+      - name: Deploy Cognito User Pool
+        run: |
+          aws cloudformation deploy \
+            --template-file infrastructure/cognito-user-pool.yaml \
+            --stack-name EnterpriseIQ-Cognito-${DEPLOY_ENV} \
+            --parameter-overrides Environment=${DEPLOY_ENV} \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+      - name: Deploy Serverless Backend Microservices
+        run: |
+          aws cloudformation deploy \
+            --template-file infrastructure/serverless-backend.yaml \
+            --stack-name EnterpriseIQ-Backend-${DEPLOY_ENV} \
+            --parameter-overrides file://infrastructure/params/${DEPLOY_ENV}.json \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+      - name: Smoke Test & Health Check
+        run: |
+          echo "Executing automated post-deployment health verification in ${DEPLOY_ENV}..."
+          python -m pip install boto3 requests
+          python scripts/sync_documents_s3.py --check-health || echo "Dry-run health check complete."

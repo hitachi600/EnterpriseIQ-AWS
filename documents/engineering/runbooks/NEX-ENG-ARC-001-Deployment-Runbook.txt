@@ -1,0 +1,15 @@
+NEXORA ENGINEERING SOP: PRODUCTION RELEASES (RUNBOOK-001)
+SECURITY CLASSIFICATION: ENGINEERING DEPARTMENT ONLY
+
+1. PRE-DEPLOYMENT GATES
+- All pull requests require 0 Critical/High SonarQube issues and >=85% unit test coverage.
+- Two Senior Staff Engineer approvals required on main branch pull requests.
+
+2. CANARY DEPLOYMENT STRATEGY ON KUBERNETES (AMAZON EKS)
+- ArgoCD triggers Canary deployment on cluster 'nexora-prod-cluster-us-east-1'.
+- Phase 1: 10% traffic routing to Canary pods for 15 minutes.
+- Automated Rollback: CloudWatch Metric Filter monitors HTTP 5xx error rate. If error rate > 0.1%, automated rollback initiates within 60 seconds.
+- Phase 2: 50% traffic for 30 minutes, followed by 100% promotion.
+
+3. SERVERLESS LAMBDA DEPLOYMENTS
+- Serverless microservices deploy using AWS SAM / CodeDeploy with Linear10PercentEvery1Minute traffic shifting strategy.

@@ -1,0 +1,167 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  EnterpriseIQ - Serverless Backend Compute & API Gateway Infrastructure
+  Deploys modular Lambda micro-handlers on Graviton2 (ARM64), Cognito JWT Authorizer,
+  and least-privilege IAM execution roles for Bedrock, DynamoDB, and S3.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+  DocumentVaultBucketName:
+    Type: String
+    Default: nexora-enterprise-kb-vault-prod
+  DynamoDBTableName:
+    Type: String
+    Default: EnterpriseIQ-Core-State-prod
+  BedrockKnowledgeBaseId:
+    Type: String
+    Default: NEXORAKB01
+
+Resources:
+  # ============================================================================
+  # 1. IAM Execution Role for Lambda Backend (Least Privilege)
+  # ============================================================================
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'EnterpriseIQ-Lambda-ExecutionRole-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudWatchLoggingPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/EnterpriseIQ-*'
+        - PolicyName: BedrockAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'bedrock:InvokeModel'
+                  - 'bedrock:ApplyGuardrail'
+                Resource:
+                  - 'arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-sonnet*'
+                  - 'arn:aws:bedrock:*::foundation-model/anthropic.claude-3-haiku*'
+                  - 'arn:aws:bedrock:*::foundation-model/amazon.titan-embed-text-v2*'
+              - Effect: Allow
+                Action:
+                  - 'bedrock:Retrieve'
+                  - 'bedrock:RetrieveAndGenerate'
+                  - 'bedrock:StartIngestionJob'
+                  - 'bedrock:GetIngestionJob'
+                Resource: !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${BedrockKnowledgeBaseId}'
+        - PolicyName: S3AndDynamoDBAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                  - 's3:ListBucket'
+                Resource:
+                  - !Sub 'arn:aws:s3:::${DocumentVaultBucketName}'
+                  - !Sub 'arn:aws:s3:::${DocumentVaultBucketName}/*'
+              - Effect: Allow
+                Action:
+                  - 'dynamodb:GetItem'
+                  - 'dynamodb:PutItem'
+                  - 'dynamodb:Query'
+                  - 'dynamodb:UpdateItem'
+                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBTableName}'
+
+  # ============================================================================
+  # 2. AWS Lambda Functions (ARM64 Graviton2 for Cost & Performance)
+  # ============================================================================
+  QueryFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'EnterpriseIQ-Query-${Environment}'
+      Runtime: python3.11
+      Architectures: [arm64]
+      Handler: backend.handlers.handler_query.lambda_handler
+      MemorySize: 512
+      Timeout: 29
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              from backend.handlers.handler_query import lambda_handler as h
+              return h(event, context)
+      Environment:
+        Variables:
+          BEDROCK_KNOWLEDGE_BASE_ID: !Ref BedrockKnowledgeBaseId
+          S3_DOCUMENT_VAULT_BUCKET: !Ref DocumentVaultBucketName
+          DYNAMODB_SINGLE_TABLE_NAME: !Ref DynamoDBTableName
+
+  DocsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'EnterpriseIQ-Docs-${Environment}'
+      Runtime: python3.11
+      Architectures: [arm64]
+      Handler: backend.handlers.handler_documents.lambda_handler
+      MemorySize: 256
+      Timeout: 15
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              from backend.handlers.handler_documents import lambda_handler as h
+              return h(event, context)
+
+  AdminFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'EnterpriseIQ-Admin-${Environment}'
+      Runtime: python3.11
+      Architectures: [arm64]
+      Handler: backend.handlers.handler_admin.lambda_handler
+      MemorySize: 256
+      Timeout: 15
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              from backend.handlers.handler_admin import lambda_handler as h
+              return h(event, context)
+
+  FeedbackFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'EnterpriseIQ-Feedback-${Environment}'
+      Runtime: python3.11
+      Architectures: [arm64]
+      Handler: backend.handlers.handler_feedback.lambda_handler
+      MemorySize: 256
+      Timeout: 10
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              from backend.handlers.handler_feedback import lambda_handler as h
+              return h(event, context)
+
+Outputs:
+  QueryFunctionArn:
+    Value: !GetAtt QueryFunction.Arn
+    Export:
+      Name: !Sub 'EnterpriseIQ-QueryFunctionArn-${Environment}'
+  LambdaRoleArn:
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub 'EnterpriseIQ-LambdaRoleArn-${Environment}'

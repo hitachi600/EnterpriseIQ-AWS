@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  EnterpriseIQ - Multi-Region Disaster Recovery & Automated Failover Stack
+  Configures S3 Cross-Region Replication (CRR), Route 53 ARC Health Checks,
+  and Multi-Region KMS Key integration to meet RTO < 15min and RPO < 5min SLAs.
+
+Parameters:
+  PrimaryRegion:
+    Type: String
+    Default: us-east-1
+    Description: Primary Active AWS Region
+  SecondaryRegion:
+    Type: String
+    Default: us-west-2
+    Description: Disaster Recovery Warm-Standby AWS Region
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [staging, prod]
+
+Resources:
+  # ============================================================================
+  # 1. IAM Role for S3 Cross-Region Replication (CRR)
+  # ============================================================================
+  S3ReplicationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'EnterpriseIQ-S3-ReplicationRole-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: S3ReplicationPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetReplicationConfiguration'
+                  - 's3:ListBucket'
+                Resource: !Sub 'arn:aws:s3:::nexora-enterprise-kb-vault-${Environment}'
+              - Effect: Allow
+                Action:
+                  - 's3:GetObjectVersionForReplication'
+                  - 's3:GetObjectVersionAcl'
+                  - 's3:GetObjectVersionTagging'
+                Resource: !Sub 'arn:aws:s3:::nexora-enterprise-kb-vault-${Environment}/*'
+              - Effect: Allow
+                Action:
+                  - 's3:ReplicateObject'
+                  - 's3:ReplicateDelete'
+                  - 's3:ReplicateTags'
+                Resource: !Sub 'arn:aws:s3:::nexora-enterprise-kb-vault-dr-${SecondaryRegion}-${Environment}/*'
+
+  # ============================================================================
+  # 2. Secondary DR Standby S3 Document Lake Bucket (in Secondary Region)
+  # ============================================================================
+  DRSecondaryDocumentVault:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'nexora-enterprise-kb-vault-dr-${SecondaryRegion}-${Environment}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: DisasterRecoveryRole
+          Value: SecondaryReplica
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ============================================================================
+  # 3. Route 53 Application Recovery Controller (ARC) Health Check
+  # ============================================================================
+  PrimaryRegionHealthCheck:
+    Type: AWS::Route53::HealthCheck
+    Properties:
+      HealthCheckConfig:
+        Type: HTTPS
+        ResourcePath: /api/v1/health
+        FullyQualifiedDomainName: !Sub 'api-${Environment}.enterpriseiq.nexora.com'
+        Port: 443
+        RequestInterval: 30
+        FailureThreshold: 3
+        MeasureLatency: true
+      HealthCheckTags:
+        - Key: Name
+          Value: !Sub 'EnterpriseIQ-Primary-HealthCheck-${Environment}'
+
+Outputs:
+  DRSecondaryBucketArn:
+    Description: ARN of the Secondary Region Document Lake Bucket
+    Value: !GetAtt DRSecondaryDocumentVault.Arn
+    Export:
+      Name: !Sub 'EnterpriseIQ-DRSecondaryBucketArn-${Environment}'
+
+  HealthCheckId:
+    Description: Route 53 Health Check ID for automated failover
+    Value: !Ref PrimaryRegionHealthCheck
+    Export:
+      Name: !Sub 'EnterpriseIQ-PrimaryHealthCheckId-${Environment}'

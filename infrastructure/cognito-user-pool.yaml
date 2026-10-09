@@ -1,0 +1,182 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  EnterpriseIQ - Amazon Cognito Identity & RBAC User Pool Infrastructure
+  Configures enterprise password policies, custom department claims,
+  MFA settings, and RBAC user groups for Nexora Technologies.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+
+Resources:
+  # ============================================================================
+  # 1. Amazon Cognito User Pool with Custom Department Attributes
+  # ============================================================================
+  NexoraUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub 'Nexora-Enterprise-UserPool-${Environment}'
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 16
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 7
+      MfaConfiguration: 'OPTIONAL'
+      EnabledMfas:
+        - 'SMS_MFA'
+        - 'SOFTWARE_TOKEN_MFA'
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+        - Name: department
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: '2'
+            MaxLength: '50'
+        - Name: employee_id
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: false
+          Required: false
+          StringAttributeConstraints:
+            MinLength: '4'
+            MaxLength: '20'
+        - Name: clearance
+          AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: '3'
+            MaxLength: '100'
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      UserPoolTags:
+        Project: EnterpriseIQ
+        Environment: !Ref Environment
+
+  # ============================================================================
+  # 2. Cognito User Pool App Client (SPA / Web Client)
+  # ============================================================================
+  NexoraUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub 'Nexora-EnterpriseIQ-WebClient-${Environment}'
+      UserPoolId: !Ref NexoraUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+      ReadAttributes:
+        - email
+        - name
+        - custom:department
+        - custom:employee_id
+        - custom:clearance
+      WriteAttributes:
+        - email
+        - name
+        - custom:department
+
+  # ============================================================================
+  # 3. Cognito RBAC User Groups (Department Clearance Tiers)
+  # ============================================================================
+  EngineeringGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: 'Engineering-Members'
+      Description: 'Core software engineering and infrastructure staff'
+      UserPoolId: !Ref NexoraUserPool
+      Precedence: 50
+
+  HRGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: 'HR-Specialists'
+      Description: 'People Operations and Talent Acquisition staff'
+      UserPoolId: !Ref NexoraUserPool
+      Precedence: 50
+
+  FinanceGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: 'Finance-Analysts'
+      Description: 'Corporate Finance, Payroll and Treasury analysts'
+      UserPoolId: !Ref NexoraUserPool
+      Precedence: 50
+
+  ITSupportGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: 'IT-Helpdesk'
+      Description: 'Internal Helpdesk, SysAdmins, and Security Operations'
+      UserPoolId: !Ref NexoraUserPool
+      Precedence: 50
+
+  OperationsGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: 'Ops-Field'
+      Description: 'Field logistics and business operations managers'
+      UserPoolId: !Ref NexoraUserPool
+      Precedence: 50
+
+  ExecutiveLeadershipGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: 'Executive-Leadership'
+      Description: 'C-Suite, Vice Presidents, and Board Observers'
+      UserPoolId: !Ref NexoraUserPool
+      Precedence: 20
+
+  GlobalAdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: 'Global-Administrators'
+      Description: 'Cloud Security and System Super Administrators'
+      UserPoolId: !Ref NexoraUserPool
+      Precedence: 1
+
+Outputs:
+  UserPoolId:
+    Description: ID of the Amazon Cognito User Pool
+    Value: !Ref NexoraUserPool
+    Export:
+      Name: !Sub 'EnterpriseIQ-UserPoolId-${Environment}'
+
+  UserPoolArn:
+    Description: ARN of the Amazon Cognito User Pool
+    Value: !GetAtt NexoraUserPool.Arn
+    Export:
+      Name: !Sub 'EnterpriseIQ-UserPoolArn-${Environment}'
+
+  UserPoolClientId:
+    Description: ID of the Cognito User Pool App Client
+    Value: !Ref NexoraUserPoolClient
+    Export:
+      Name: !Sub 'EnterpriseIQ-UserPoolClientId-${Environment}'

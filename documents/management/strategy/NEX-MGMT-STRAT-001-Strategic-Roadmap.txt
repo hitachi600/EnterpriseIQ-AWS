@@ -1,0 +1,10 @@
+RESTRICTED & HIGHLY CONFIDENTIAL - MANAGEMENT ONLY
+DOCUMENT ID: NEX-MGMT-STRAT-001
+
+1. MARKET EXPANSION & GEOGRAPHIC STRATEGY
+- EMEA Hub Launch in London Q2 2027.
+- Commercialization of Nexora's internal GenAI knowledge platform on AWS Marketplace.
+
+2. M&A TARGETS
+- Target Alpha (₹100 Cr - ₹150 Cr): Compliance scanning for AWS GovCloud & Indian Data Protection DPDP compliance.
+- Target Beta (₹65 Cr - ₹85 Cr): Real-time vector observability and hallucination detection.

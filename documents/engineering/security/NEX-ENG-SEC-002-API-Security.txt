@@ -1,0 +1,8 @@
+NEXORA TECH - API SECURITY ARCHITECTURE SPECIFICATION
+1. AUTHENTICATION & TOKEN HANDLING
+- All incoming REST endpoints exposed through Amazon API Gateway must validate asymmetric RSA-256 signatures against Cognito JWKS URI.
+- Token expiration (TTL) must not exceed 60 minutes for Access Tokens.
+
+2. SECRETS MANAGEMENT
+- Hardcoded API credentials in source repositories are strictly forbidden.
+- All database passwords and third-party tokens must be stored in AWS Secrets Manager with 30-day automatic rotation Lambda functions.

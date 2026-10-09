@@ -1,0 +1,321 @@
+openapi: 3.0.1
+info:
+  title: EnterpriseIQ REST API
+  description: Secure Multi-Department Generative AI Knowledge Retrieval API powered by Amazon Bedrock
+  version: 1.0.0
+
+servers:
+  - url: https://{apiId}.execute-api.us-east-1.amazonaws.com/prod
+    description: Production API Gateway Stage
+
+paths:
+  /api/v1/query:
+    post:
+      summary: Submit Natural Language Query to Bedrock RAG Engine
+      operationId: submitQuery
+      security:
+        - CognitoAuthorizer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  maxLength: 1200
+                  example: "What is our work-from-home policy?"
+                sessionId:
+                  type: string
+                  example: "sess-8821"
+      responses:
+        '200':
+          description: Successful Grounded Answer with Citations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RAGQueryResponse'
+        '400':
+          description: Invalid input or missing query
+        '401':
+          description: Unauthorized / Expired JWT token
+        '403':
+          description: Access Denied due to Department RBAC restriction
+        '500':
+          description: Bedrock or Internal Lambda Failure
+
+  /api/v1/documents:
+    get:
+      summary: List Authorized Department Documents
+      operationId: listDocuments
+      security:
+        - CognitoAuthorizer: []
+      responses:
+        '200':
+          description: List of authorized policies and runbooks
+
+  /api/v1/documents/presign:
+    post:
+      summary: Generate S3 Pre-Signed Upload URL for Ingestion
+      operationId: presignUpload
+      security:
+        - CognitoAuthorizer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fileName
+              properties:
+                fileName:
+                  type: string
+                  example: "NEX-HR-POL-001.pdf"
+                department:
+                  type: string
+                  example: "Human Resources"
+                classification:
+                  type: string
+                  enum: [PUBLIC_INTERNAL, DEPARTMENT_ONLY, CONFIDENTIAL, RESTRICTED]
+      responses:
+        '200':
+          description: Pre-signed S3 URL generated
+
+  /api/v1/admin/metrics:
+    get:
+      summary: Fetch System Usage & Bedrock Token Metrics
+      operationId: getAdminMetrics
+      security:
+        - CognitoAuthorizer: []
+      responses:
+        '200':
+          description: Aggregated operational metrics
+        '403':
+          description: Forbidden (Non-admin access attempt)
+
+  /api/v1/admin/kb-sync:
+    post:
+      summary: Trigger Asynchronous Bedrock Knowledge Base Ingestion Sync
+      operationId: triggerKbSync
+      security:
+        - CognitoAuthorizer: []
+      responses:
+        '200':
+          description: Sync ingestion job started
+        '403':
+          description: Forbidden (Non-admin access attempt)
+
+  /api/v1/feedback:
+    post:
+      summary: Submit User Rating and Evaluation for Model Grounding
+      operationId: submitFeedback
+      security:
+        - CognitoAuthorizer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - messageId
+                - rating
+              properties:
+                messageId:
+                  type: string
+                rating:
+                  type: string
+                  enum: [helpful, not_helpful]
+                category:
+                  type: string
+                comment:
+                  type: string
+  /api/v1/approvals:
+    get:
+      summary: List Pending Document Approvals in S3 Quarantine
+      operationId: listApprovals
+      security:
+        - CognitoAuthorizer: []
+      responses:
+        '200':
+          description: Pending document quarantine queue
+    put:
+      summary: Approve or Reject Staged Document for Bedrock Indexing
+      operationId: reviewApproval
+      security:
+        - CognitoAuthorizer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - approvalId
+                - action
+              properties:
+                approvalId:
+                  type: string
+                action:
+                  type: string
+                  enum: [APPROVE, REJECT]
+                reviewNotes:
+                  type: string
+      responses:
+        '200':
+          description: Approval status updated and EventBridge rule triggered
+
+  /api/v1/tickets:
+    get:
+      summary: List IT Helpdesk and Escalated Support Tickets
+      operationId: listTickets
+      security:
+        - CognitoAuthorizer: []
+      responses:
+        '200':
+          description: List of support tickets
+    post:
+      summary: Create New Support Ticket from AI Assistant Escalation
+      operationId: createTicket
+      security:
+        - CognitoAuthorizer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subject
+                - category
+                - priority
+              properties:
+                subject:
+                  type: string
+                category:
+                  type: string
+                priority:
+                  type: string
+                  enum: [LOW, MEDIUM, HIGH, CRITICAL]
+                description:
+                  type: string
+                conversationContext:
+                  type: string
+      responses:
+        '201':
+          description: Support ticket created
+
+  /api/v1/workplace/leaves:
+    get:
+      summary: Get Employee PTO Balances and Leave History
+      operationId: getLeaves
+      security:
+        - CognitoAuthorizer: []
+      responses:
+        '200':
+          description: Leave history and PTO balances
+    post:
+      summary: Submit PTO Leave Request (HRMS Module)
+      operationId: applyLeave
+      security:
+        - CognitoAuthorizer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - leaveType
+                - startDate
+                - endDate
+                - totalDays
+              properties:
+                leaveType:
+                  type: string
+                startDate:
+                  type: string
+                endDate:
+                  type: string
+                totalDays:
+                  type: number
+                reason:
+                  type: string
+      responses:
+        '201':
+          description: Leave request submitted
+
+  /api/v1/workplace/expenses:
+    get:
+      summary: List Expense Claims and Travel Reimbursements
+      operationId: listExpenses
+      security:
+        - CognitoAuthorizer: []
+      responses:
+        '200':
+          description: Expense claims history
+    post:
+      summary: Submit New Expense Claim (Finance Module)
+      operationId: submitExpense
+      security:
+        - CognitoAuthorizer: []
+      responses:
+        '201':
+          description: Expense claim submitted
+
+components:
+  securitySchemes:
+    CognitoAuthorizer:
+      type: apiKey
+      name: Authorization
+      in: header
+      x-amazon-apigateway-authtype: cognito_user_pools
+      x-amazon-apigateway-authorizer:
+        type: cognito_user_pools
+        providerARNs:
+          - arn:aws:cognito-idp:us-east-1:123456789012:userpool/us-east-1_NexoraUserPool
+
+  schemas:
+    RAGQueryResponse:
+      type: object
+      properties:
+        messageId:
+          type: string
+        text:
+          type: string
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Citation'
+        confidenceScore:
+          type: number
+        securityStatus:
+          type: string
+        latencyMs:
+          type: integer
+        tokensUsed:
+          type: object
+
+    Citation:
+      type: object
+      properties:
+        id:
+          type: string
+        documentId:
+          type: string
+        documentTitle:
+          type: string
+        department:
+          type: string
+        classification:
+          type: string
+        s3Uri:
+          type: string
+        snippet:
+          type: string
+        relevanceScore:
+          type: number

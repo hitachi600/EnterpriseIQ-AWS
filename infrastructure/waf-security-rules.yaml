@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  EnterpriseIQ - AWS WAF (Web Application Firewall) Edge & API Protection
+  Implements OWASP Top 10 managed rules, IP rate limiting, and SQLi/XSS inspection.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+
+Resources:
+  # ============================================================================
+  # 1. AWS WAF WebACL for API Gateway & CloudFront
+  # ============================================================================
+  EnterpriseIQWebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub 'EnterpriseIQ-WebACL-${Environment}'
+      Scope: REGIONAL
+      DefaultAction:
+        Allow: {}
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub 'EnterpriseIQWebACLMetric-${Environment}'
+      Rules:
+        # Rule 1: IP Rate Limiting (100 req per 5 minutes per IP)
+        - Name: RateLimitPerIP
+          Priority: 1
+          Action:
+            Block: {}
+          Statement:
+            RateBasedStatement:
+              Limit: 100
+              AggregateKeyType: IP
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: EnterpriseIQRateLimitMetric
+
+        # Rule 2: AWS Managed OWASP Top 10 Common Rule Set
+        - Name: AWSManagedRulesCommonRuleSet
+          Priority: 2
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedRulesCommonRuleSetMetric
+
+        # Rule 3: AWS Managed Known Bad Inputs Rule Set
+        - Name: AWSManagedRulesKnownBadInputsRuleSet
+          Priority: 3
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesKnownBadInputsRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedRulesKnownBadInputsRuleSetMetric
+
+Outputs:
+  WebACLArn:
+    Value: !GetAtt EnterpriseIQWebACL.Arn
+    Export:
+      Name: !Sub 'EnterpriseIQ-WebACLArn-${Environment}'

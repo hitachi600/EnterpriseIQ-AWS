@@ -1,0 +1,13 @@
+{
+  "metadataAttributes": {
+    "department": "Engineering",
+    "classification": "DEPARTMENT_ONLY",
+    "documentId": "NEX-ENG-ARC-001",
+    "title": "Nexora Cloud Production Deployment & Zero-Downtime Pipeline Runbook",
+    "uploadedBy": "gautham@nexora.com",
+    "version": "4.5",
+    "lastUpdated": "2026-09-29",
+    "author": "Gautham",
+    "category": "Runbook"
+  }
+}

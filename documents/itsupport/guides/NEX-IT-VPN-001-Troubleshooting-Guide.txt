@@ -1,0 +1,17 @@
+NEXORA IT HELPDESK RUNBOOK: REMOTE CONNECTIVITY & VPN
+DOCUMENT ID: NEX-IT-VPN-001
+
+1. GLOBALPROTECT GATEWAYS
+- Primary US Gateway: 'vpn-east.nexora.internal' (Port 443)
+- European Gateway: 'vpn-eu.nexora.internal'
+- Asia-Pacific Gateway: 'vpn-apac.nexora.internal'
+
+2. RESOLVING COMMON ERROR CODES
+- Error 504 / Connection Timeout:
+  Step 1: Restart Palo Alto Networks GlobalProtect service in Windows Services or Mac launchctl.
+  Step 2: Flush local DNS cache ('ipconfig /flushdns' or 'sudo dscacheutil -flushcache').
+  Step 3: Ensure corporate Zscaler client is running version 4.2 or higher.
+
+3. HARDWARE MFA / YUBIKEY RESETS
+- Insert YubiKey 5C NFC into USB port and tap the gold capacitive sensor for 3 seconds.
+- Urgent helpdesk Slack channel: #it-urgent-helpdesk.

@@ -1,0 +1,13 @@
+{
+  "metadataAttributes": {
+    "department": "Engineering",
+    "classification": "DEPARTMENT_ONLY",
+    "documentId": "NEX-ENG-SEC-002",
+    "title": "Engineering API Security Standards & Microservices Hardening Guide",
+    "uploadedBy": "gautham@nexora.com",
+    "version": "2.1",
+    "lastUpdated": "2026-09-02",
+    "author": "Gautham",
+    "category": "Security Standard"
+  }
+}
